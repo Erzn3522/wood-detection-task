@@ -15,6 +15,17 @@ RUN curl -fL "${ORT_URL}" -o ort.tgz \
     && mv onnxruntime-linux-x64-gpu-${ORT_VERSION} onnxruntime \
     && rm ort.tgz
 
+
+# Pre-fetch CMake FetchContent deps as separate cached layers
+RUN curl -fL "https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz" \
+      -o /tmp/json.tar.xz \
+    && mkdir -p /opt/json \
+    && tar -xJf /tmp/json.tar.xz -C /opt/json --strip-components=1 \
+    && rm /tmp/json.tar.xz
+
+RUN git clone --depth=1 --branch v3.0 \
+      https://github.com/p-ranav/argparse.git /opt/argparse
+
 WORKDIR /src
 COPY CMakeLists.txt /src/
 COPY include /src/include
@@ -22,6 +33,8 @@ COPY src /src/src
 RUN cmake -S /src -B /build \
       -DCMAKE_BUILD_TYPE=Release \
       -DONNXRUNTIME_ROOT=/opt/onnxruntime \
+      -DFETCHCONTENT_SOURCE_DIR_JSON=/opt/json \
+      -DFETCHCONTENT_SOURCE_DIR_ARGPARSE=/opt/argparse \
     && cmake --build /build -j"$(nproc)"
 
 # ---- runtime ----
