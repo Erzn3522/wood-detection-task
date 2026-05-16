@@ -5,3 +5,4 @@ out/
 wood-dataset/train/
 wood-dataset/valid/
 wood-dataset/.DS_Store
+onnxruntime-osx-arm64-1.20.1/*
