@@ -1,0 +1,7 @@
+.DS_Store
+docs/
+build/
+out/
+wood-dataset/train/
+wood-dataset/valid/
+wood-dataset/.DS_Store
