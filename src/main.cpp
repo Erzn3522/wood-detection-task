@@ -1,4 +1,5 @@
 #include "board_inference.hpp"
+#include "evaluator.hpp"
 #include "frame_loader.hpp"
 #include "io.hpp"
 #include "yolo_session.hpp"
@@ -86,7 +87,51 @@ int main(int argc, char* argv[])
     }
 
     if (program.is_subcommand_used("test")) {
-        std::cout << "test mode — not yet implemented\n";
+        auto& cmd             = program.at<argparse::ArgumentParser>("test");
+        const auto frames_dir = cmd.get("--frames-dir");
+        const auto labels_dir = cmd.get("--labels-dir");
+        const auto model      = cmd.get("--model");
+        const auto out        = cmd.get("--out");
+        const auto device     = cmd.get("--device");
+        const float conf_thr  = cmd.get<float>("--conf-threshold");
+        const float iou_thr   = cmd.get<float>("--iou-threshold");
+
+        const auto boards = frame_loader::build_boards(frames_dir);
+        YoloSession session(model, device);
+
+        const std::filesystem::path out_dir(out);
+        const std::filesystem::path pred_dir = out_dir / "predictions";
+
+        std::vector<BoardMetrics>   all_metrics;
+        std::vector<EvalDetection>  all_dets;
+        int total_frames = 0;
+        int total_gt     = 0;
+
+        for (const auto& [board_id, frame_paths] : boards) {
+            auto result = board_inference::predict_board(frame_paths, session, conf_thr);
+            io::write_board_json(result, pred_dir);
+
+            auto gt                = evaluator::parse_gt(result, labels_dir);
+            auto [metrics, e_dets] = evaluator::match(result, gt, iou_thr, conf_thr);
+
+            total_gt += static_cast<int>(gt.size());
+            total_frames += metrics.num_frames;
+            all_metrics.push_back(metrics);
+            all_dets.insert(all_dets.end(), e_dets.begin(), e_dets.end());
+
+            std::cout << "board " << board_id << ": " << result.knots.size() << " pred, "
+                      << gt.size() << " gt  F1=" << metrics.f1 << '\n';
+        }
+
+        auto eval = evaluator::aggregate(std::move(all_metrics), std::move(all_dets), total_gt,
+                                         total_frames, iou_thr);
+
+        io::write_metrics_json(eval, out_dir);
+        io::write_report_md(eval, out_dir);
+
+        std::cout << "\nPrecision=" << eval.precision << "  Recall=" << eval.recall
+                  << "  F1=" << eval.f1 << "  mAP50=" << eval.map50 << '\n';
+        std::cout << "Done → " << out << '\n';
         return 0;
     }
 
