@@ -21,4 +21,9 @@ void write_board_json(const BoardResult& result, const std::filesystem::path& ou
 void write_metrics_json(const EvalResult& result, const std::filesystem::path& out_dir);
 void write_report_md(const EvalResult& result, const std::filesystem::path& out_dir);
 
+// Stitches all board frames horizontally, draws detected knot bboxes and
+// saves to {out_dir}/images/{board_index}.png.
+void write_board_image(const BoardResult& result, const std::filesystem::path& frames_dir,
+                       const std::filesystem::path& out_dir);
+
 } // namespace io

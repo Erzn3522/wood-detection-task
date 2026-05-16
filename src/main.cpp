@@ -2,6 +2,7 @@
 #include "evaluator.hpp"
 #include "frame_loader.hpp"
 #include "io.hpp"
+#include "visualizer.hpp"
 #include "yolo_session.hpp"
 
 #include <argparse/argparse.hpp>
@@ -53,8 +54,29 @@ int main(int argc, char* argv[])
         .scan<'f', float>()
         .help("IoU threshold for TP/FP matching in evaluation");
 
+    argparse::ArgumentParser visualize_cmd("visualize");
+    visualize_cmd.add_description("Tile board frames and draw predicted knot bboxes (+ optional GT).");
+    visualize_cmd.add_argument("--predictions-dir")
+        .required()
+        .help("Directory containing per-board JSON files (output of predict/test)");
+    visualize_cmd.add_argument("--frames-dir")
+        .required()
+        .help("Directory containing {board}_{frame}.png files");
+    visualize_cmd.add_argument("--out").required().help("Output directory for tiled PNG images");
+    visualize_cmd.add_argument("--labels-dir")
+        .default_value(std::string(""))
+        .help("Directory containing GT YOLO labels (optional; enables TP/FP/FN coloring)");
+    visualize_cmd.add_argument("--mode")
+        .default_value(std::string("per_frame"))
+        .help("Visualization mode: per_frame (default) | tiled");
+    visualize_cmd.add_argument("--cols")
+        .default_value(3)
+        .scan<'i', int>()
+        .help("Number of frame columns per row in tiled mode (default: 3)");
+
     program.add_subparser(predict_cmd);
     program.add_subparser(test_cmd);
+    program.add_subparser(visualize_cmd);
 
     try {
         program.parse_args(argc, argv);
@@ -79,6 +101,7 @@ int main(int argc, char* argv[])
         for (const auto& [board_id, frame_paths] : boards) {
             auto result = board_inference::predict_board(frame_paths, session, conf_thr);
             io::write_board_json(result, out_dir);
+            io::write_board_image(result, frames_dir, out_dir);
             std::cout << "board " << board_id << ": " << result.knots.size() << " knots\n";
             ++board_num;
         }
@@ -110,6 +133,7 @@ int main(int argc, char* argv[])
         for (const auto& [board_id, frame_paths] : boards) {
             auto result = board_inference::predict_board(frame_paths, session, conf_thr);
             io::write_board_json(result, pred_dir);
+            io::write_board_image(result, frames_dir, pred_dir);
 
             auto gt                = evaluator::parse_gt(result, labels_dir);
             auto [metrics, e_dets] = evaluator::match(result, gt, iou_thr, conf_thr);
@@ -132,6 +156,29 @@ int main(int argc, char* argv[])
         std::cout << "\nPrecision=" << eval.precision << "  Recall=" << eval.recall
                   << "  F1=" << eval.f1 << "  mAP50=" << eval.map50 << '\n';
         std::cout << "Done → " << out << '\n';
+        return 0;
+    }
+
+    if (program.is_subcommand_used("visualize")) {
+        auto& cmd                  = program.at<argparse::ArgumentParser>("visualize");
+        const auto predictions_dir = cmd.get("--predictions-dir");
+        const auto frames_dir      = cmd.get("--frames-dir");
+        const auto out             = cmd.get("--out");
+        const auto labels_dir      = cmd.get("--labels-dir");
+        const auto mode_str        = cmd.get("--mode");
+        const int  cols            = cmd.get<int>("--cols");
+
+        visualizer::Mode mode;
+        if (mode_str == "tiled")
+            mode = visualizer::Mode::Tiled;
+        else if (mode_str == "per_frame")
+            mode = visualizer::Mode::PerFrame;
+        else {
+            std::cerr << "Unknown --mode: " << mode_str << ". Use per_frame or tiled.\n";
+            return 1;
+        }
+
+        visualizer::run(mode, predictions_dir, frames_dir, out, labels_dir, cols);
         return 0;
     }
 

@@ -59,6 +59,7 @@ add_executable(wood_knot_detector
     src/yolo_session.cpp
     src/board_inference.cpp
     src/evaluator.cpp
+    src/visualizer.cpp
 )
 
 target_include_directories(wood_knot_detector PRIVATE

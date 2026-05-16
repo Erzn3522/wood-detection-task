@@ -5,6 +5,7 @@
 
 #include <nlohmann/json.hpp>
 #include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
 
 #include <algorithm>
 #include <fstream>
@@ -50,6 +51,36 @@ void write_board_json(const BoardResult& r, const std::filesystem::path& out_dir
     if (!f)
         throw std::runtime_error("Cannot write: " + out_path.string());
     f << j.dump(2) << '\n';
+}
+
+void write_board_image(const BoardResult& r, const std::filesystem::path& frames_dir,
+                       const std::filesystem::path& out_dir)
+{
+    // Stitch frames horizontally into one board image
+    std::vector<cv::Mat> frames;
+    frames.reserve(r.frames.size());
+    for (const auto& fname : r.frames)
+        frames.push_back(load_png(frames_dir / fname));
+
+    cv::Mat board;
+    cv::hconcat(frames, board);
+
+    // Draw detected knot bboxes
+    for (const auto& k : r.knots) {
+        const cv::Point pt1(static_cast<int>(k.x1), static_cast<int>(k.y1));
+        const cv::Point pt2(static_cast<int>(k.x2), static_cast<int>(k.y2));
+        cv::rectangle(board, pt1, pt2, cv::Scalar(0, 255, 0), 2);
+
+        const std::string label = std::to_string(static_cast<int>(k.conf * 100)) + "%";
+        cv::putText(board, label, cv::Point(pt1.x, std::max(pt1.y - 4, 10)),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(0, 255, 0), 1);
+    }
+
+    const auto img_dir = out_dir / "images";
+    std::filesystem::create_directories(img_dir);
+    const auto out_path = img_dir / (std::to_string(r.board_index) + ".png");
+    if (!cv::imwrite(out_path.string(), board))
+        throw std::runtime_error("Cannot write image: " + out_path.string());
 }
 
 void write_metrics_json(const EvalResult& r, const std::filesystem::path& out_dir)
