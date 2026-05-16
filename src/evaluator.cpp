@@ -25,6 +25,21 @@ static float iou(const BoardDetection& a, const BoardDetection& b)
     return inter / (area_a + area_b - inter);
 }
 
+static float iomin(const BoardDetection& a, const BoardDetection& b)
+{
+    const float ix1 = std::max(a.x1, b.x1);
+    const float iy1 = std::max(a.y1, b.y1);
+    const float ix2 = std::min(a.x2, b.x2);
+    const float iy2 = std::min(a.y2, b.y2);
+    const float iw  = std::max(0.0f, ix2 - ix1);
+    const float ih  = std::max(0.0f, iy2 - iy1);
+    if (iw == 0.0f || ih == 0.0f)
+        return 0.0f;
+    const float inter    = iw * ih;
+    const float min_area = std::min((a.x2 - a.x1) * (a.y2 - a.y1), (b.x2 - b.x1) * (b.y2 - b.y1));
+    return min_area > 0.0f ? inter / min_area : 0.0f;
+}
+
 static float safe_div(float num, float den)
 {
     return den > 0.0f ? num / den : 0.0f;
@@ -106,7 +121,7 @@ std::pair<BoardMetrics, std::vector<EvalDetection>> match(const BoardResult& pre
         for (size_t gi = 0; gi < gt.size(); ++gi) {
             if (gt_matched[gi])
                 continue;
-            const float v = iou(p, gt[gi]);
+            const float v = std::max(iou(p, gt[gi]), iomin(p, gt[gi]));
             if (v > best_iou) {
                 best_iou = v;
                 best_gt  = static_cast<int>(gi);
