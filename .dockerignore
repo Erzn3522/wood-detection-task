@@ -1,0 +1,12 @@
+.git/
+build/
+out/
+docs/
+onnxruntime-osx-arm64-1.20.1/
+wood-dataset/
+.DS_Store
+.clang-format
+README.md
+.github/
+.claude/
+scripts/
