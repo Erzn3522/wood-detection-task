@@ -7,7 +7,7 @@
 // ---------------------------------------------------------------------------
 // IoU + greedy NMS (operates on board-coord detections)
 // ---------------------------------------------------------------------------
-static float iou(const BoardDetection& a, const BoardDetection& b)
+static float iou(const BoardDetection &a, const BoardDetection &b)
 {
     const float ix1 = std::max(a.x1, b.x1);
     const float iy1 = std::max(a.y1, b.y1);
@@ -19,7 +19,7 @@ static float iou(const BoardDetection& a, const BoardDetection& b)
     if (iw == 0.0f || ih == 0.0f)
         return 0.0f;
 
-    const float inter  = iw * ih;
+    const float inter = iw * ih;
     const float area_a = (a.x2 - a.x1) * (a.y2 - a.y1);
     const float area_b = (b.x2 - b.x1) * (b.y2 - b.y1);
     return inter / (area_a + area_b - inter);
@@ -28,9 +28,9 @@ static float iou(const BoardDetection& a, const BoardDetection& b)
 static std::vector<BoardDetection> nms(std::vector<BoardDetection> dets, float iou_thresh)
 {
     std::sort(dets.begin(), dets.end(),
-              [](const BoardDetection& a, const BoardDetection& b) { return a.conf > b.conf; });
+              [](const BoardDetection &a, const BoardDetection &b) { return a.conf > b.conf; });
 
-    std::vector<bool>          suppressed(dets.size(), false);
+    std::vector<bool> suppressed(dets.size(), false);
     std::vector<BoardDetection> kept;
 
     for (size_t i = 0; i < dets.size(); ++i) {
@@ -48,7 +48,7 @@ static std::vector<BoardDetection> nms(std::vector<BoardDetection> dets, float i
 // ---------------------------------------------------------------------------
 // Board prediction
 // ---------------------------------------------------------------------------
-static std::vector<int> spans_frames(float x1, float x2, const std::vector<int>& frame_widths)
+static std::vector<int> spans_frames(float x1, float x2, const std::vector<int> &frame_widths)
 {
     std::vector<int> result;
     int offset = 0;
@@ -60,35 +60,34 @@ static std::vector<int> spans_frames(float x1, float x2, const std::vector<int>&
     return result;
 }
 
-namespace board_inference
-{
+namespace board_inference {
 
-BoardResult predict_board(const std::vector<FramePath>& frames, const YoloSession& session,
+BoardResult predict_board(const std::vector<FramePath> &frames, const YoloSession &session,
                           float conf_threshold)
 {
     BoardResult result;
-    result.board_index    = frames[0].board_idx;
+    result.board_index = frames[0].board_idx;
     result.board_height_px = 0;
 
     std::vector<BoardDetection> all_dets;
     int x_offset = 0;
 
-    for (const auto& fp : frames) {
-        const cv::Mat img  = io::load_png(fp.path);
-        const int     w    = img.cols;
-        const int     h    = img.rows;
+    for (const auto &fp : frames) {
+        const cv::Mat img = io::load_png(fp.path);
+        const int w = img.cols;
+        const int h = img.rows;
 
         result.frames.push_back(fp.path.filename().string());
         result.frame_widths.push_back(w);
         if (result.board_height_px == 0)
             result.board_height_px = h;
 
-        for (const auto& d : session.predict(img, conf_threshold)) {
+        for (const auto &d : session.predict(img, conf_threshold)) {
             BoardDetection bd;
-            bd.x1   = d.x1 + x_offset;
-            bd.y1   = d.y1;
-            bd.x2   = d.x2 + x_offset;
-            bd.y2   = d.y2;
+            bd.x1 = d.x1 + x_offset;
+            bd.y1 = d.y1;
+            bd.x2 = d.x2 + x_offset;
+            bd.y2 = d.y2;
             bd.conf = d.conf;
             all_dets.push_back(bd);
         }
@@ -101,7 +100,7 @@ BoardResult predict_board(const std::vector<FramePath>& frames, const YoloSessio
     // Board-level NMS to remove cross-frame duplicates
     auto kept = nms(std::move(all_dets), 0.5f);
 
-    for (auto& bd : kept) {
+    for (auto &bd : kept) {
         bd.spans_frames = spans_frames(bd.x1, bd.x2, result.frame_widths);
         result.knots.push_back(std::move(bd));
     }

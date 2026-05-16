@@ -10,7 +10,7 @@
 #include <iostream>
 #include <string>
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
     argparse::ArgumentParser program("wood_knot_detector", "1.0");
     program.add_description("Wood knot detection from sequential board frame images.");
@@ -39,9 +39,8 @@ int main(int argc, char* argv[])
         .required()
         .help("Directory containing {board}_{frame}.txt YOLO labels");
     test_cmd.add_argument("--model").required().help("Path to ONNX model");
-    test_cmd.add_argument("--out")
-        .required()
-        .help("Output directory for predictions, metrics.json and REPORT.md");
+    test_cmd.add_argument("--out").required().help(
+        "Output directory for predictions, metrics.json and REPORT.md");
     test_cmd.add_argument("--device")
         .default_value(std::string("cpu"))
         .help("Inference device: cpu | gpu");
@@ -55,7 +54,8 @@ int main(int argc, char* argv[])
         .help("IoU threshold for TP/FP matching in evaluation");
 
     argparse::ArgumentParser visualize_cmd("visualize");
-    visualize_cmd.add_description("Tile board frames and draw predicted knot bboxes (+ optional GT).");
+    visualize_cmd.add_description(
+        "Tile board frames and draw predicted knot bboxes (+ optional GT).");
     visualize_cmd.add_argument("--predictions-dir")
         .required()
         .help("Directory containing per-board JSON files (output of predict/test)");
@@ -69,10 +69,8 @@ int main(int argc, char* argv[])
     visualize_cmd.add_argument("--mode")
         .default_value(std::string("per_frame"))
         .help("Visualization mode: per_frame (default) | tiled");
-    visualize_cmd.add_argument("--cols")
-        .default_value(3)
-        .scan<'i', int>()
-        .help("Number of frame columns per row in tiled mode (default: 3)");
+    visualize_cmd.add_argument("--cols").default_value(3).scan<'i', int>().help(
+        "Number of frame columns per row in tiled mode (default: 3)");
 
     program.add_subparser(predict_cmd);
     program.add_subparser(test_cmd);
@@ -80,25 +78,25 @@ int main(int argc, char* argv[])
 
     try {
         program.parse_args(argc, argv);
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         std::cerr << e.what() << "\n\n" << program;
         return 1;
     }
 
     if (program.is_subcommand_used("predict")) {
-        auto& cmd          = program.at<argparse::ArgumentParser>("predict");
+        auto &cmd = program.at<argparse::ArgumentParser>("predict");
         const auto frames_dir = cmd.get("--frames-dir");
-        const auto model      = cmd.get("--model");
-        const auto out        = cmd.get("--out");
-        const auto device     = cmd.get("--device");
-        const float conf_thr  = cmd.get<float>("--conf-threshold");
+        const auto model = cmd.get("--model");
+        const auto out = cmd.get("--out");
+        const auto device = cmd.get("--device");
+        const float conf_thr = cmd.get<float>("--conf-threshold");
 
         const auto boards = frame_loader::build_boards(frames_dir);
         YoloSession session(model, device);
 
         const std::filesystem::path out_dir(out);
         int board_num = 0;
-        for (const auto& [board_id, frame_paths] : boards) {
+        for (const auto &[board_id, frame_paths] : boards) {
             auto result = board_inference::predict_board(frame_paths, session, conf_thr);
             io::write_board_json(result, out_dir);
             io::write_board_image(result, frames_dir, out_dir);
@@ -110,14 +108,14 @@ int main(int argc, char* argv[])
     }
 
     if (program.is_subcommand_used("test")) {
-        auto& cmd             = program.at<argparse::ArgumentParser>("test");
+        auto &cmd = program.at<argparse::ArgumentParser>("test");
         const auto frames_dir = cmd.get("--frames-dir");
         const auto labels_dir = cmd.get("--labels-dir");
-        const auto model      = cmd.get("--model");
-        const auto out        = cmd.get("--out");
-        const auto device     = cmd.get("--device");
-        const float conf_thr  = cmd.get<float>("--conf-threshold");
-        const float iou_thr   = cmd.get<float>("--iou-threshold");
+        const auto model = cmd.get("--model");
+        const auto out = cmd.get("--out");
+        const auto device = cmd.get("--device");
+        const float conf_thr = cmd.get<float>("--conf-threshold");
+        const float iou_thr = cmd.get<float>("--iou-threshold");
 
         const auto boards = frame_loader::build_boards(frames_dir);
         YoloSession session(model, device);
@@ -125,17 +123,17 @@ int main(int argc, char* argv[])
         const std::filesystem::path out_dir(out);
         const std::filesystem::path pred_dir = out_dir / "predictions";
 
-        std::vector<BoardMetrics>   all_metrics;
-        std::vector<EvalDetection>  all_dets;
+        std::vector<BoardMetrics> all_metrics;
+        std::vector<EvalDetection> all_dets;
         int total_frames = 0;
-        int total_gt     = 0;
+        int total_gt = 0;
 
-        for (const auto& [board_id, frame_paths] : boards) {
+        for (const auto &[board_id, frame_paths] : boards) {
             auto result = board_inference::predict_board(frame_paths, session, conf_thr);
             io::write_board_json(result, pred_dir);
             io::write_board_image(result, frames_dir, pred_dir);
 
-            auto gt                = evaluator::parse_gt(result, labels_dir);
+            auto gt = evaluator::parse_gt(result, labels_dir);
             auto [metrics, e_dets] = evaluator::match(result, gt, iou_thr, conf_thr);
 
             total_gt += static_cast<int>(gt.size());
@@ -160,13 +158,13 @@ int main(int argc, char* argv[])
     }
 
     if (program.is_subcommand_used("visualize")) {
-        auto& cmd                  = program.at<argparse::ArgumentParser>("visualize");
+        auto &cmd = program.at<argparse::ArgumentParser>("visualize");
         const auto predictions_dir = cmd.get("--predictions-dir");
-        const auto frames_dir      = cmd.get("--frames-dir");
-        const auto out             = cmd.get("--out");
-        const auto labels_dir      = cmd.get("--labels-dir");
-        const auto mode_str        = cmd.get("--mode");
-        const int  cols            = cmd.get<int>("--cols");
+        const auto frames_dir = cmd.get("--frames-dir");
+        const auto out = cmd.get("--out");
+        const auto labels_dir = cmd.get("--labels-dir");
+        const auto mode_str = cmd.get("--mode");
+        const int cols = cmd.get<int>("--cols");
 
         visualizer::Mode mode;
         if (mode_str == "tiled")

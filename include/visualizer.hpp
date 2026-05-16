@@ -3,8 +3,7 @@
 #include <filesystem>
 #include <string>
 
-namespace visualizer
-{
+namespace visualizer {
 
 enum class Mode {
     Tiled,    // one PNG per board; N frames per row (--cols)
@@ -26,9 +25,9 @@ enum class Mode {
 // Without labels_dir: all predictions drawn in green.
 //
 // cols is only used by Mode::Tiled; ignored in Mode::PerFrame.
-void run(Mode mode, const std::filesystem::path& predictions_dir,
-         const std::filesystem::path& frames_dir, const std::filesystem::path& out_dir,
-         const std::filesystem::path& labels_dir, // empty = no GT comparison
+void run(Mode mode, const std::filesystem::path &predictions_dir,
+         const std::filesystem::path &frames_dir, const std::filesystem::path &out_dir,
+         const std::filesystem::path &labels_dir, // empty = no GT comparison
          int cols);
 
 } // namespace visualizer
