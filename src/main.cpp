@@ -1,4 +1,10 @@
+#include "board_inference.hpp"
+#include "frame_loader.hpp"
+#include "io.hpp"
+#include "yolo_session.hpp"
+
 #include <argparse/argparse.hpp>
+#include <filesystem>
 #include <iostream>
 #include <string>
 
@@ -57,7 +63,25 @@ int main(int argc, char* argv[])
     }
 
     if (program.is_subcommand_used("predict")) {
-        std::cout << "predict mode — not yet implemented\n";
+        auto& cmd          = program.at<argparse::ArgumentParser>("predict");
+        const auto frames_dir = cmd.get("--frames-dir");
+        const auto model      = cmd.get("--model");
+        const auto out        = cmd.get("--out");
+        const auto device     = cmd.get("--device");
+        const float conf_thr  = cmd.get<float>("--conf-threshold");
+
+        const auto boards = frame_loader::build_boards(frames_dir);
+        YoloSession session(model, device);
+
+        const std::filesystem::path out_dir(out);
+        int board_num = 0;
+        for (const auto& [board_id, frame_paths] : boards) {
+            auto result = board_inference::predict_board(frame_paths, session, conf_thr);
+            io::write_board_json(result, out_dir);
+            std::cout << "board " << board_id << ": " << result.knots.size() << " knots\n";
+            ++board_num;
+        }
+        std::cout << "Done. " << board_num << " boards → " << out << '\n';
         return 0;
     }
 

@@ -52,9 +52,13 @@ find_library(ORT_LIB onnxruntime
 # ---------------------------------------------------------------------------
 # Target
 # ---------------------------------------------------------------------------
-file(GLOB_RECURSE SOURCES src/*.cpp)
-
-add_executable(wood_knot_detector ${SOURCES})
+add_executable(wood_knot_detector
+    src/main.cpp
+    src/frame_loader.cpp
+    src/io.cpp
+    src/yolo_session.cpp
+    src/board_inference.cpp
+)
 
 target_include_directories(wood_knot_detector PRIVATE
     include
