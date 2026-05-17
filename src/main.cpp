@@ -95,15 +95,16 @@ int main(int argc, char *argv[])
         YoloSession session(model, device);
 
         const std::filesystem::path out_dir(out);
+        const std::filesystem::path pred_dir = out_dir / "predictions";
         int board_num = 0;
         for (const auto &[board_id, frame_paths] : boards) {
             auto result = board_inference::predict_board(frame_paths, session, conf_thr);
-            io::write_board_json(result, out_dir);
-            io::write_board_image(result, frames_dir, out_dir);
+            io::write_board_json(result, pred_dir);
+            io::write_board_image(result, frames_dir, pred_dir);
             std::cout << "board " << board_id << ": " << result.knots.size() << " knots\n";
             ++board_num;
         }
-        std::cout << "Done. " << board_num << " boards → " << out << '\n';
+        std::cout << "Done. " << board_num << " boards → " << pred_dir.string() << '\n';
         return 0;
     }
 
