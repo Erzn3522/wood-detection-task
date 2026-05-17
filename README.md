@@ -284,8 +284,21 @@ out/
 
 Use this when you have your own board images without labels.
 
+**Linux / Windows**
 ```bash
 docker run --rm \
+  -v $PWD/wood-dataset/test/images:/data/images \
+  -v $PWD/out:/out \
+  ghcr.io/erzn3522/wood-detection-task:latest \
+  predict \
+    --frames-dir /data/images \
+    --model      /model/yolo26m.onnx \
+    --out        /out
+```
+
+**macOS (Apple Silicon)**
+```bash
+docker run --rm --platform linux/amd64 \
   -v $PWD/wood-dataset/test/images:/data/images \
   -v $PWD/out:/out \
   ghcr.io/erzn3522/wood-detection-task:latest \
@@ -303,8 +316,25 @@ docker run --rm \
 
 Run this after `test` or `predict` to inspect detections frame by frame.
 
+**Linux / Windows**
 ```bash
 docker run --rm \
+  -v $PWD/wood-dataset/test/images:/data/images \
+  -v $PWD/wood-dataset/test/labels:/data/labels \
+  -v $PWD/out/predictions:/predictions \
+  -v $PWD/out/vis:/vis \
+  ghcr.io/erzn3522/wood-detection-task:latest \
+  visualize \
+    --predictions-dir /predictions \
+    --frames-dir      /data/images \
+    --labels-dir      /data/labels \
+    --out             /vis \
+    --mode            per_frame
+```
+
+**macOS (Apple Silicon)**
+```bash
+docker run --rm --platform linux/amd64 \
   -v $PWD/wood-dataset/test/images:/data/images \
   -v $PWD/wood-dataset/test/labels:/data/labels \
   -v $PWD/out/predictions:/predictions \
@@ -336,8 +366,26 @@ Omit `--labels-dir` to skip GT comparison — all predictions are drawn in green
 
 For a grid view instead of per-frame:
 
+**Linux / Windows**
 ```bash
 docker run --rm \
+  -v $PWD/wood-dataset/test/images:/data/images \
+  -v $PWD/wood-dataset/test/labels:/data/labels \
+  -v $PWD/out/predictions:/predictions \
+  -v $PWD/out/vis:/vis \
+  ghcr.io/erzn3522/wood-detection-task:latest \
+  visualize \
+    --predictions-dir /predictions \
+    --frames-dir      /data/images \
+    --labels-dir      /data/labels \
+    --out             /vis \
+    --mode            tiled \
+    --cols            3
+```
+
+**macOS (Apple Silicon)**
+```bash
+docker run --rm --platform linux/amd64 \
   -v $PWD/wood-dataset/test/images:/data/images \
   -v $PWD/wood-dataset/test/labels:/data/labels \
   -v $PWD/out/predictions:/predictions \
