@@ -28,8 +28,8 @@ int main(int argc, char *argv[])
     predict_cmd.add_argument("--model").required().help("Path to ONNX model");
     predict_cmd.add_argument("--out").required().help("Output directory for per-board JSON files");
     predict_cmd.add_argument("--device")
-        .default_value(std::string("cpu"))
-        .help("Inference device: cpu | gpu");
+        .default_value(std::string("gpu"))
+        .help("Inference device: gpu (default, falls back to cpu if unavailable) | cpu");
     predict_cmd.add_argument("--conf-threshold")
         .default_value(0.25f)
         .scan<'f', float>()
@@ -47,8 +47,8 @@ int main(int argc, char *argv[])
     test_cmd.add_argument("--out").required().help(
         "Output directory for predictions, metrics.json and REPORT.md");
     test_cmd.add_argument("--device")
-        .default_value(std::string("cpu"))
-        .help("Inference device: cpu | gpu");
+        .default_value(std::string("gpu"))
+        .help("Inference device: gpu (default, falls back to cpu if unavailable) | cpu");
     test_cmd.add_argument("--conf-threshold")
         .default_value(0.25f)
         .scan<'f', float>()
