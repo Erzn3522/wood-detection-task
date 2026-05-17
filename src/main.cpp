@@ -9,9 +9,14 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <sys/stat.h>
 
 int main(int argc, char *argv[])
 {
+    // When running inside Docker the process is root; without this, output
+    // files and dirs are created with restrictive permissions that the host
+    // user cannot access after the container exits.
+    umask(0000);
     argparse::ArgumentParser program("wood_knot_detector", "1.0");
     program.add_description("Wood knot detection from sequential board frame images.");
 
