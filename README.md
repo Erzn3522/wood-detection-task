@@ -9,15 +9,15 @@ Detects knots in lumber board images using a YOLO26m end-to-end ONNX model. Fram
 - [Prerequisites](#prerequisites)
 - [1. Clone the repository](#1-clone-the-repository)
 - [2. Pull the Docker image](#2-pull-the-docker-image)
-- [3. Build from source](#3-build-from-source) *(alternative to Docker)*
-  - [Linux (Debian / Ubuntu / bare server)](#linux-debian--ubuntu--bare-server)
+- [3. Run the commands (Docker)](#3-run-the-commands-docker)
+  - [3a. Test](#3a-test--inference--evaluation-against-ground-truth)
+  - [3b. Predict](#3b-predict--inference-only-no-ground-truth-needed)
+  - [3c. Visualize](#3c-visualize--annotated-per-frame-images)
+- [GPU inference](#gpu-inference)
+- [4. Build from source](#4-build-from-source) *(alternative to Docker)*
+  - [Linux (Debian / Ubuntu / Codespaces)](#linux-debian--ubuntu--codespaces)
   - [Google Colab](#google-colab)
   - [macOS (Apple Silicon)](#macos-apple-silicon)
-- [4. Run the commands (Docker)](#4-run-the-commands-docker)
-  - [4a. Test](#4a-test--inference--evaluation-against-ground-truth)
-  - [4b. Predict](#4b-predict--inference-only-no-ground-truth-needed)
-  - [4c. Visualize](#4c-visualize--annotated-per-frame-images)
-- [GPU inference](#gpu-inference)
 - [CLI reference](#cli-reference)
 - [Output schemas](#output-schemas)
 - [Test set results](#test-set-results)
@@ -64,16 +64,15 @@ Install Git LFS first (see above), then clone:
 git lfs install
 git clone https://github.com/erzn3522/wood-detection-task.git
 cd wood-detection-task
-git lfs pull
 ```
 
-`git lfs pull` downloads the ONNX model (`model/yolo26m.onnx`) and the sealed test split (`wood-dataset/test/`). This is ~170 MB.
+`git lfs install` must run before `git clone` — LFS files (ONNX model and test images, ~170 MB) are downloaded automatically during the clone.
 
 ---
 
 ## 2. Pull the Docker image
 
-> If Docker is not available, skip to [Build from source](#3-build-from-source).
+> If Docker is not available, skip to [Build from source](#4-build-from-source).
 
 The model is baked into the image — no separate model download needed at runtime.
 
@@ -91,149 +90,11 @@ docker pull --platform linux/amd64 ghcr.io/erzn3522/wood-detection-task:latest
 
 ---
 
-## 3. Build from source
+## 3. Run the commands (Docker)
 
-Use this if Docker is not available. Skip to [Run the commands](#4-run-the-commands-docker) if you pulled the Docker image.
+> These commands use the Docker image. If you built from source, the run commands are included in the [Build from source](#4-build-from-source) section below.
 
-### Linux (Debian / Ubuntu / bare server)
-
-```bash
-apt-get install -y build-essential cmake libopencv-dev
-
-curl -fL https://github.com/microsoft/onnxruntime/releases/download/v1.20.1/onnxruntime-linux-x64-gpu-1.20.1.tgz | tar -xz
-
-git lfs install
-git clone https://github.com/erzn3522/wood-detection-task.git
-cd wood-detection-task
-git lfs pull
-
-cmake -S . -B build \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DONNXRUNTIME_ROOT=$PWD/../onnxruntime-linux-x64-gpu-1.20.1
-
-cmake --build build -j$(nproc)
-
-export LD_LIBRARY_PATH=$PWD/../onnxruntime-linux-x64-gpu-1.20.1/lib:$LD_LIBRARY_PATH
-
-# predict — inference only
-./build/wood_knot_detector predict \
-  --frames-dir wood-dataset/test/images \
-  --model      model/yolo26m.onnx \
-  --out        out
-
-# test — inference + evaluation against ground truth
-./build/wood_knot_detector test \
-  --frames-dir wood-dataset/test/images \
-  --labels-dir wood-dataset/test/labels \
-  --model      model/yolo26m.onnx \
-  --out        out
-
-# visualize — annotated per-frame images (run after predict or test)
-./build/wood_knot_detector visualize \
-  --predictions-dir out/predictions \
-  --frames-dir      wood-dataset/test/images \
-  --labels-dir      wood-dataset/test/labels \
-  --out             out/vis \
-  --mode            per_frame   # alternative: --mode tiled --cols 3  (one grid image per board)
-```
-
----
-
-### Google Colab
-
-Run each step in a separate cell. Paths are set for the `/content/` working directory.
-
-```python
-!apt-get install -y build-essential cmake libopencv-dev
-```
-
-```python
-!curl -fL https://github.com/microsoft/onnxruntime/releases/download/v1.20.1/onnxruntime-linux-x64-gpu-1.20.1.tgz | tar -xz -C /content
-```
-
-```python
-!git lfs install
-!git clone https://github.com/erzn3522/wood-detection-task.git /content/wood-detection-task
-%cd /content/wood-detection-task
-!git lfs pull
-```
-
-```python
-!cmake -S . -B build \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DONNXRUNTIME_ROOT=/content/onnxruntime-linux-x64-gpu-1.20.1
-
-!cmake --build build -j$(nproc)
-```
-
-```python
-import os
-os.environ["LD_LIBRARY_PATH"] = "/content/onnxruntime-linux-x64-gpu-1.20.1/lib:" + os.environ.get("LD_LIBRARY_PATH", "")
-
-# predict — inference only
-!./build/wood_knot_detector predict \
-  --frames-dir wood-dataset/test/images \
-  --model      model/yolo26m.onnx \
-  --out        out \
-  --device     gpu
-```
-
-```python
-# test — inference + evaluation against ground truth
-!./build/wood_knot_detector test \
-  --frames-dir wood-dataset/test/images \
-  --labels-dir wood-dataset/test/labels \
-  --model      model/yolo26m.onnx \
-  --out        out \
-  --device     gpu
-```
-
-```python
-# visualize — annotated per-frame images (run after predict or test)
-!./build/wood_knot_detector visualize \
-  --predictions-dir out/predictions \
-  --frames-dir      wood-dataset/test/images \
-  --labels-dir      wood-dataset/test/labels \
-  --out             out/vis \
-  --mode            per_frame   # alternative: --mode tiled --cols 3  (one grid image per board)
-```
-
-To display the output images inline in Colab:
-
-```python
-import glob
-from IPython.display import Image, display
-
-for path in sorted(glob.glob("out/vis/*.png"))[:5]:
-    display(Image(path))
-```
-
----
-
-### macOS (Apple Silicon)
-
-```bash
-brew install cmake opencv
-
-curl -fL https://github.com/microsoft/onnxruntime/releases/download/v1.20.1/onnxruntime-osx-arm64-1.20.1.tgz | tar -xz
-
-cmake -S . -B build \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DONNXRUNTIME_ROOT=$PWD/onnxruntime-osx-arm64-1.20.1
-
-cmake --build build -j$(nproc)
-
-export DYLD_LIBRARY_PATH=$PWD/onnxruntime-osx-arm64-1.20.1/lib
-./build/wood_knot_detector --help
-```
-
----
-
-## 4. Run the commands (Docker)
-
-> These commands use the Docker image. If you built from source, the run commands are included in the [Build from source](#3-build-from-source) section above.
-
-### 4a. Test — inference + evaluation against ground truth
+### 3a. Test — inference + evaluation against ground truth
 
 Runs the full pipeline on the test set and produces a metrics report.
 
@@ -276,11 +137,11 @@ out/
 └── REPORT.md                 # human-readable report with per-board table
 ```
 
-> After running `test`, run the `visualize` subcommand with `--mode per_frame` to inspect detections frame by frame with TP/FP/FN coloring. See [4c. Visualize](#4c-visualize--annotated-per-frame-images).
+> After running `test`, run the `visualize` subcommand with `--mode per_frame` to inspect detections frame by frame with TP/FP/FN coloring. See [3c. Visualize](#3c-visualize--annotated-per-frame-images).
 
 ---
 
-### 4b. Predict — inference only, no ground truth needed
+### 3b. Predict — inference only, no ground truth needed
 
 Use this when you have your own board images without labels.
 
@@ -312,7 +173,7 @@ docker run --rm --platform linux/amd64 \
 
 ---
 
-### 4c. Visualize — annotated per-frame images
+### 3c. Visualize — annotated per-frame images
 
 Run this after `test` or `predict` to inspect detections frame by frame.
 
@@ -423,6 +284,156 @@ If no CUDA-capable GPU is available the runtime falls back to CPU automatically 
 
 ---
 
+## 4. Build from source
+
+Use this if Docker is not available.
+
+### Linux (Debian / Ubuntu / Codespaces)
+
+> Run these commands from inside the cloned repository (section 1 must be complete).
+> GitHub Codespaces users: the repo is already open. If the model file is missing run `git lfs pull` once, then continue from the `apt-get` step below.
+
+```bash
+sudo apt-get install -y build-essential cmake libopencv-dev
+
+curl -fL https://github.com/microsoft/onnxruntime/releases/download/v1.20.1/onnxruntime-linux-x64-gpu-1.20.1.tgz | tar -xz
+
+cmake -S . -B build \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DONNXRUNTIME_ROOT=$PWD/onnxruntime-linux-x64-gpu-1.20.1
+
+cmake --build build -j$(nproc)
+
+export LD_LIBRARY_PATH=$PWD/onnxruntime-linux-x64-gpu-1.20.1/lib:$LD_LIBRARY_PATH
+
+# predict — inference only
+./build/wood_knot_detector predict \
+  --frames-dir wood-dataset/test/images \
+  --model      model/yolo26m.onnx \
+  --out        out
+
+# test — inference + evaluation against ground truth
+./build/wood_knot_detector test \
+  --frames-dir wood-dataset/test/images \
+  --labels-dir wood-dataset/test/labels \
+  --model      model/yolo26m.onnx \
+  --out        out
+
+# visualize — annotated per-frame images (run after predict or test)
+./build/wood_knot_detector visualize \
+  --predictions-dir out/predictions \
+  --frames-dir      wood-dataset/test/images \
+  --labels-dir      wood-dataset/test/labels \
+  --out             out/vis \
+  --mode            per_frame   # alternative: --mode tiled --cols 3  (one grid image per board)
+```
+
+---
+
+### Google Colab
+
+Run each step in a separate cell. Paths are set for the `/content/` working directory.
+
+```python
+!apt-get install -y build-essential cmake libopencv-dev
+```
+
+```python
+!curl -fL https://github.com/microsoft/onnxruntime/releases/download/v1.20.1/onnxruntime-linux-x64-gpu-1.20.1.tgz | tar -xz -C /content
+```
+
+```python
+!git lfs install
+!git clone https://github.com/erzn3522/wood-detection-task.git /content/wood-detection-task
+%cd /content/wood-detection-task
+!git lfs pull
+```
+
+```python
+!cmake -S . -B build \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DONNXRUNTIME_ROOT=/content/onnxruntime-linux-x64-gpu-1.20.1
+
+!cmake --build build -j$(nproc)
+```
+
+```python
+import os
+os.environ["LD_LIBRARY_PATH"] = "/content/onnxruntime-linux-x64-gpu-1.20.1/lib:" + os.environ.get("LD_LIBRARY_PATH", "")
+
+# predict — inference only
+!./build/wood_knot_detector predict \
+  --frames-dir wood-dataset/test/images \
+  --model      model/yolo26m.onnx \
+  --out        out \
+  --device     gpu
+```
+
+```python
+# test — inference + evaluation against ground truth
+!./build/wood_knot_detector test \
+  --frames-dir wood-dataset/test/images \
+  --labels-dir wood-dataset/test/labels \
+  --model      model/yolo26m.onnx \
+  --out        out \
+  --device     gpu
+```
+
+```python
+# visualize — annotated per-frame images (run after predict or test)
+!./build/wood_knot_detector visualize \
+  --predictions-dir out/predictions \
+  --frames-dir      wood-dataset/test/images \
+  --labels-dir      wood-dataset/test/labels \
+  --out             out/vis \
+  --mode            per_frame   # alternative: --mode tiled --cols 3  (one grid image per board)
+```
+
+To display the output images inline in Colab:
+
+```python
+import glob
+from IPython.display import Image, display
+
+for path in sorted(glob.glob("out/vis/*.png"))[:5]:
+    display(Image(path))
+```
+
+---
+
+### macOS (Apple Silicon)
+
+```bash
+brew install cmake opencv
+
+curl -fL https://github.com/microsoft/onnxruntime/releases/download/v1.20.1/onnxruntime-osx-arm64-1.20.1.tgz | tar -xz
+
+cmake -S . -B build \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DONNXRUNTIME_ROOT=$PWD/onnxruntime-osx-arm64-1.20.1
+
+cmake --build build -j$(nproc)
+
+export DYLD_LIBRARY_PATH=$PWD/onnxruntime-osx-arm64-1.20.1/lib
+
+# test — inference + evaluation against ground truth
+./build/wood_knot_detector test \
+  --frames-dir wood-dataset/test/images \
+  --labels-dir wood-dataset/test/labels \
+  --model      model/yolo26m.onnx \
+  --out        out
+
+# visualize — annotated per-frame images (run after test)
+./build/wood_knot_detector visualize \
+  --predictions-dir out/predictions \
+  --frames-dir      wood-dataset/test/images \
+  --labels-dir      wood-dataset/test/labels \
+  --out             out/vis \
+  --mode            per_frame
+```
+
+---
+
 ## CLI reference
 
 | Flag | Default | Description |
@@ -431,7 +442,7 @@ If no CUDA-capable GPU is available the runtime falls back to CPU automatically 
 | `--labels-dir` | required (test) | Directory of `{board}_{frame}.txt` YOLO labels |
 | `--model` | required | Path to ONNX model |
 | `--out` | required | Output directory |
-| `--device` | `cpu` | `cpu` or `gpu` |
+| `--device` | `gpu` | `gpu` (falls back to `cpu` if no CUDA device is available) or `cpu` |
 | `--conf-threshold` | `0.25` | Minimum confidence to keep a detection |
 | `--iou-threshold` | `0.5` | IoU threshold for TP/FP matching (test only) |
 | `--mode` | `per_frame` | Visualization mode: `per_frame` or `tiled` |
