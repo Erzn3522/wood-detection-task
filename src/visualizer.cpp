@@ -121,8 +121,9 @@ static std::vector<bool> match_predictions(const std::vector<BoardDetection> &kn
             const float ratio = (std::min(area_k, area_g) > 0.0f)
                                     ? std::max(area_k, area_g) / std::min(area_k, area_g)
                                     : 0.0f;
-            const float v = (ratio <= 1.5f) ? std::max(iou(knots[idx], gt[gi]), iomin(knots[idx], gt[gi]))
-                                            : iou(knots[idx], gt[gi]);
+            const float v = (ratio <= 1.5f)
+                                ? std::max(iou(knots[idx], gt[gi]), iomin(knots[idx], gt[gi]))
+                                : iou(knots[idx], gt[gi]);
             if (v > best) {
                 best = v;
                 best_gi = static_cast<int>(gi);

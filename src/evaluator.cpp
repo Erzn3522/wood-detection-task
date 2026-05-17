@@ -141,8 +141,8 @@ std::pair<BoardMetrics, std::vector<EvalDetection>> match(const BoardResult &pre
             const float ratio = (std::min(area_p, area_g) > 0.0f)
                                     ? std::max(area_p, area_g) / std::min(area_p, area_g)
                                     : 0.0f;
-            const float v = (ratio <= 1.5f) ? std::max(iou(p, gt[gi]), iomin(p, gt[gi]))
-                                             : iou(p, gt[gi]);
+            const float v =
+                (ratio <= 1.5f) ? std::max(iou(p, gt[gi]), iomin(p, gt[gi])) : iou(p, gt[gi]);
             if (v > best_iou) {
                 best_iou = v;
                 best_gt = static_cast<int>(gi);
