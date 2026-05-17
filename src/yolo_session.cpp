@@ -90,12 +90,21 @@ struct YoloSession::Impl {
         opts.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
 
         if (device == "gpu") {
-            OrtCUDAProviderOptions cuda_opts{};
-            try {
-                opts.AppendExecutionProvider_CUDA(cuda_opts);
-            } catch (const Ort::Exception &e) {
-                std::cerr << "[warn] CUDA EP unavailable: " << e.what()
-                          << " — falling back to CPU\n";
+            // AppendExecutionProvider_CUDA can SIGSEGV (not throw) when CUDA
+            // libraries are absent (e.g. Docker Desktop on macOS). Gate on
+            // NVIDIA device nodes which are only present on real GPU hosts.
+            const bool has_gpu = std::filesystem::exists("/dev/nvidia0") ||
+                                 std::filesystem::exists("/dev/nvidiactl");
+            if (has_gpu) {
+                OrtCUDAProviderOptions cuda_opts{};
+                try {
+                    opts.AppendExecutionProvider_CUDA(cuda_opts);
+                } catch (const Ort::Exception &e) {
+                    std::cerr << "[warn] CUDA EP unavailable: " << e.what()
+                              << " — falling back to CPU\n";
+                }
+            } else {
+                std::cerr << "[warn] No NVIDIA device found — falling back to CPU\n";
             }
         }
 
