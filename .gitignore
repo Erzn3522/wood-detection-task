@@ -1,7 +1,8 @@
 .DS_Store
 docs/
 build/
-out/
+out/*
+!out/.gitkeep
 wood-dataset/train/
 wood-dataset/valid/
 wood-dataset/.DS_Store
