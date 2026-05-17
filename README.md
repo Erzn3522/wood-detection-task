@@ -478,11 +478,11 @@ export DYLD_LIBRARY_PATH=$PWD/onnxruntime-osx-arm64-1.20.1/lib
   "iou_threshold": 0.5,
   "num_boards": 27,
   "num_frames": 852,
-  "totals": {"tp": 1469, "fp": 160, "fn": 370},
-  "precision": 0.902,
-  "recall": 0.799,
-  "f1": 0.847,
-  "map50": 0.774
+  "totals": {"tp": 1455, "fp": 288, "fn": 384},
+  "precision": 0.835,
+  "recall": 0.791,
+  "f1": 0.812,
+  "map50": 0.751
 }
 ```
 
@@ -494,47 +494,47 @@ Evaluated on the sealed test split (27 boards, 852 frames). Matching criterion: 
 
 | Metric | Value |
 |---|---|
-| Precision | 0.902 |
-| Recall | 0.799 |
-| F1 | 0.847 |
-| mAP50 | 0.774 |
+| Precision | 0.835 |
+| Recall | 0.791 |
+| F1 | 0.812 |
+| mAP50 | 0.751 |
 
 <details>
 <summary>Per-board results (worst → best F1)</summary>
 
 | Board | Frames | TP | FP | FN | Precision | Recall | F1 |
 |---|---|---|---|---|---|---|---|
-| 1091 | 32 | 45 | 7 | 56 | 0.865 | 0.446 | 0.588 |
-| 1205 | 33 | 63 | 33 | 17 | 0.656 | 0.788 | 0.716 |
-| 1221 | 32 | 40 | 6 | 19 | 0.870 | 0.678 | 0.762 |
-| 1152 | 35 | 51 | 19 | 9 | 0.729 | 0.850 | 0.785 |
-| 1187 | 30 | 43 | 4 | 18 | 0.915 | 0.705 | 0.796 |
-| 1092 | 37 | 81 | 15 | 26 | 0.844 | 0.757 | 0.798 |
-| 1189 | 36 | 76 | 1 | 29 | 0.987 | 0.724 | 0.835 |
-| 1141 | 35 | 88 | 9 | 24 | 0.907 | 0.786 | 0.842 |
-| 1113 | 30 | 38 | 3 | 11 | 0.927 | 0.776 | 0.844 |
-| 1218 | 29 | 28 | 3 | 7 | 0.903 | 0.800 | 0.848 |
-| 1232 | 32 | 72 | 3 | 22 | 0.960 | 0.766 | 0.852 |
-| 1075 | 35 | 64 | 5 | 17 | 0.928 | 0.790 | 0.853 |
-| 1173 | 36 | 56 | 11 | 8 | 0.836 | 0.875 | 0.855 |
-| 1067 | 31 | 43 | 4 | 10 | 0.915 | 0.811 | 0.860 |
-| 1190 | 34 | 40 | 0 | 13 | 1.000 | 0.755 | 0.860 |
-| 1165 | 35 | 71 | 8 | 14 | 0.899 | 0.835 | 0.866 |
-| 1151 | 28 | 33 | 2 | 7 | 0.943 | 0.825 | 0.880 |
-| 1070 | 35 | 77 | 5 | 16 | 0.939 | 0.828 | 0.880 |
-| 1052 | 31 | 59 | 4 | 11 | 0.937 | 0.843 | 0.887 |
-| 1136 | 33 | 67 | 7 | 8 | 0.905 | 0.893 | 0.899 |
-| 1169 | 37 | 81 | 5 | 10 | 0.942 | 0.890 | 0.915 |
-| 1188 | 32 | 49 | 3 | 6 | 0.942 | 0.891 | 0.916 |
-| 1041 | 28 | 40 | 2 | 2 | 0.952 | 0.952 | 0.952 |
-| 1177 | 30 | 44 | 0 | 4 | 1.000 | 0.917 | 0.957 |
-| 1049 | 36 | 80 | 1 | 4 | 0.988 | 0.952 | 0.970 |
-| 1224 | 29 | 38 | 0 | 2 | 1.000 | 0.950 | 0.974 |
+| 1091 | 32 | 42 | 13 | 59 | 0.764 | 0.416 | 0.538 |
+| 1092 | 37 | 63 | 39 | 44 | 0.618 | 0.589 | 0.603 |
+| 1205 | 33 | 59 | 47 | 21 | 0.557 | 0.738 | 0.634 |
+| 1187 | 30 | 40 | 18 | 21 | 0.690 | 0.656 | 0.672 |
+| 1136 | 33 | 61 | 24 | 14 | 0.718 | 0.813 | 0.763 |
+| 1152 | 35 | 54 | 27 | 6 | 0.667 | 0.900 | 0.766 |
+| 1221 | 32 | 43 | 9 | 16 | 0.827 | 0.729 | 0.775 |
+| 1075 | 35 | 62 | 12 | 19 | 0.838 | 0.765 | 0.800 |
+| 1218 | 29 | 26 | 4 | 9 | 0.867 | 0.743 | 0.800 |
+| 1173 | 36 | 57 | 16 | 7 | 0.781 | 0.891 | 0.832 |
+| 1188 | 32 | 45 | 8 | 10 | 0.849 | 0.818 | 0.833 |
+| 1165 | 35 | 74 | 18 | 11 | 0.804 | 0.871 | 0.836 |
+| 1190 | 34 | 40 | 2 | 13 | 0.952 | 0.755 | 0.842 |
+| 1141 | 35 | 93 | 11 | 19 | 0.894 | 0.830 | 0.861 |
+| 1067 | 31 | 45 | 6 | 8 | 0.882 | 0.849 | 0.865 |
+| 1070 | 35 | 75 | 5 | 18 | 0.938 | 0.806 | 0.867 |
+| 1151 | 28 | 33 | 3 | 7 | 0.917 | 0.825 | 0.868 |
+| 1232 | 32 | 78 | 6 | 16 | 0.929 | 0.830 | 0.876 |
+| 1189 | 36 | 82 | 0 | 23 | 1.000 | 0.781 | 0.877 |
+| 1113 | 30 | 41 | 3 | 8 | 0.932 | 0.837 | 0.882 |
+| 1169 | 37 | 78 | 5 | 13 | 0.940 | 0.857 | 0.897 |
+| 1052 | 31 | 61 | 5 | 9 | 0.924 | 0.871 | 0.897 |
+| 1049 | 36 | 77 | 5 | 7 | 0.939 | 0.917 | 0.928 |
+| 1224 | 29 | 36 | 1 | 4 | 0.973 | 0.900 | 0.935 |
+| 1177 | 30 | 46 | 0 | 2 | 1.000 | 0.958 | 0.979 |
+| 1041 | 28 | 42 | 1 | 0 | 0.977 | 1.000 | 0.988 |
 | 126 | 1 | 2 | 0 | 0 | 1.000 | 1.000 | 1.000 |
 
 </details>
 
-The low recall on board 1091 (F1=0.588) is driven by many small knots near frame edges that fall below the confidence threshold at this scale.
+The low recall on board 1091 (F1=0.538) is driven by many small knots near frame edges that fall below the confidence threshold at this scale.
 
 ---
 
@@ -557,6 +557,10 @@ I started with the medium (`m`) variant. Once its metrics looked good enough at 
 **Development process**
 
 I used Claude as a coding assistant for the C++ implementation. I designed the full architecture, defined the data flow between components, and drove every implementation decision. Claude translated those decisions into C++ code. I chose this approach because while I have systems programming experience, I do not write C++ regularly. I understand what the code needs to do and why, but writing C++ would have taken significantly longer for me. I reviewed the code, tested the pipeline end-to-end, diagnosed and fixed issues (such as the IoMin matching bug and the FetchContent Docker failure), and iterated until the results were correct.
+
+**GPU inference**
+
+The default device is `gpu` with automatic CPU fallback. I was not able to test GPU inference directly — my development machine is a Mac (Apple Silicon), which does not support CUDA. The environments I tested on were macOS local, GitHub Codespaces (bare Linux server, CPU only), and Google Colab with T4 GPU
 
 **Repository visibility**
 
