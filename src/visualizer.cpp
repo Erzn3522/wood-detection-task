@@ -153,6 +153,11 @@ static void run_tiled_impl(const std::filesystem::path &predictions_dir,
                            const std::filesystem::path &out_dir,
                            const std::filesystem::path &labels_dir, int cols)
 {
+    if (!std::filesystem::is_directory(predictions_dir)) {
+        std::cerr << "[error] predictions directory not found: " << predictions_dir
+                  << "\nRun 'predict' or 'test' first to generate predictions.\n";
+        return;
+    }
     std::filesystem::create_directories(out_dir);
     const bool has_gt = !labels_dir.empty() && std::filesystem::is_directory(labels_dir);
 
