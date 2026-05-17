@@ -20,26 +20,38 @@ struct LetterboxInfo {
     int pad_top;
 };
 
+// Resizes the input frame to kInputSize x kInputSize while preserving aspect ratio.
+// Padding (gray 114) is added symmetrically on the shorter axis.
+// Returns the padded canvas along with the scale factor and pad offsets needed
+// to map coordinates back to the original frame space.
 static LetterboxInfo letterbox(const cv::Mat &bgr)
 {
+    // Uniform scale that fits the frame into the square input without cropping.
     const float scale = std::min(static_cast<float>(kInputSize) / bgr.cols,
                                  static_cast<float>(kInputSize) / bgr.rows);
     const int new_w = static_cast<int>(bgr.cols * scale);
     const int new_h = static_cast<int>(bgr.rows * scale);
+
+    // Center the resized image by splitting the remaining pixels equally.
     const int pad_left = (kInputSize - new_w) / 2;
     const int pad_top = (kInputSize - new_h) / 2;
 
     cv::Mat resized;
     cv::resize(bgr, resized, cv::Size(new_w, new_h));
 
+    // Fill canvas with gray (114) and copy the resized frame into the center.
     cv::Mat canvas(kInputSize, kInputSize, CV_8UC3, cv::Scalar(114, 114, 114));
     resized.copyTo(canvas(cv::Rect(pad_left, pad_top, new_w, new_h)));
 
     return {canvas, scale, pad_left, pad_top};
 }
 
+// Converts a BGR uint8 canvas to a normalized float CHW tensor (RGB channel order).
+// Output layout: [R plane, G plane, B plane], each pixel in [0, 1].
+// This matches the input format expected by the YOLO ONNX model.
 static std::vector<float> mat_to_chw(const cv::Mat &bgr_canvas)
 {
+    // YOLO expects RGB, OpenCV stores BGR.
     cv::Mat rgb;
     cv::cvtColor(bgr_canvas, rgb, cv::COLOR_BGR2RGB);
 
@@ -48,6 +60,7 @@ static std::vector<float> mat_to_chw(const cv::Mat &bgr_canvas)
     for (int h = 0; h < kInputSize; ++h) {
         for (int w = 0; w < kInputSize; ++w) {
             const auto &px = rgb.at<cv::Vec3b>(h, w);
+            // Write each channel into its own plane, normalize to [0, 1].
             chw[0 * plane + h * kInputSize + w] = px[0] / 255.0f;
             chw[1 * plane + h * kInputSize + w] = px[1] / 255.0f;
             chw[2 * plane + h * kInputSize + w] = px[2] / 255.0f;
@@ -66,6 +79,9 @@ struct YoloSession::Impl {
     std::vector<std::string> input_names;
     std::vector<std::string> output_names;
 
+    // Creates an ORT session with optional CUDA execution provider.
+    // If CUDA EP registration fails (driver/version mismatch), falls back to CPU
+    // with a warning so inference can still proceed on non-GPU machines.
     static Ort::Session make_session(Ort::Env &env, const std::filesystem::path &path,
                                      const std::string &device)
     {
@@ -107,11 +123,18 @@ YoloSession::YoloSession(const std::filesystem::path &model_path, const std::str
 
 YoloSession::~YoloSession() = default;
 
+// Runs inference on a single BGR frame. Applies letterbox preprocessing,
+// feeds the result into the ORT session, and parses the end-to-end output
+// tensor of shape [1, kMaxDets, 6] where each row is [x1, y1, x2, y2, conf, cls].
+// Coordinates are returned in original frame pixel space, clipped to frame bounds.
+// Detections below conf_threshold are discarded.
 std::vector<Detection> YoloSession::predict(const cv::Mat &bgr_frame, float conf_threshold) const
 {
+    // Preprocess: letterbox resize + CHW float tensor.
     const auto lb = letterbox(bgr_frame);
     const auto chw = mat_to_chw(lb.canvas);
 
+    // Wrap the CHW buffer in an ORT tensor without copying.
     const std::array<int64_t, 4> input_shape = {1, 3, kInputSize, kInputSize};
     auto memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
     auto input_tensor =
@@ -123,6 +146,7 @@ std::vector<Detection> YoloSession::predict(const cv::Mat &bgr_frame, float conf
     auto outputs =
         impl_->session.Run(Ort::RunOptions{nullptr}, &in_name, &input_tensor, 1, &out_name, 1);
 
+    // Output is [1, kMaxDets, 6]; get a flat pointer and stride by 6.
     const float *data = outputs[0].GetTensorData<float>();
 
     std::vector<Detection> dets;
@@ -137,17 +161,19 @@ std::vector<Detection> YoloSession::predict(const cv::Mat &bgr_frame, float conf
         if (conf < conf_threshold)
             continue;
 
-        // Unscale from letterbox space to original frame space
+        // Unscale from letterbox space to original frame space.
         float x1 = (row[0] - lb.pad_left) / lb.scale;
         float y1 = (row[1] - lb.pad_top) / lb.scale;
         float x2 = (row[2] - lb.pad_left) / lb.scale;
         float y2 = (row[3] - lb.pad_top) / lb.scale;
 
+        // Clip to frame bounds to handle predictions on the padding region.
         x1 = std::clamp(x1, 0.0f, orig_w);
         y1 = std::clamp(y1, 0.0f, orig_h);
         x2 = std::clamp(x2, 0.0f, orig_w);
         y2 = std::clamp(y2, 0.0f, orig_h);
 
+        // Skip degenerate boxes that collapsed after clipping.
         if (x2 <= x1 || y2 <= y1)
             continue;
 

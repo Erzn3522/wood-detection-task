@@ -9,6 +9,9 @@
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+// Computes intersection-over-union between two axis-aligned bboxes.
+// Intersection is clipped to zero if boxes do not overlap.
+// Returns inter / (area_a + area_b - inter).
 static float iou(const BoardDetection &a, const BoardDetection &b)
 {
     const float ix1 = std::max(a.x1, b.x1);
@@ -25,6 +28,10 @@ static float iou(const BoardDetection &a, const BoardDetection &b)
     return inter / (area_a + area_b - inter);
 }
 
+// Intersection over minimum area — catches the case where a small GT box is
+// fully contained inside a larger prediction (IoU would be low, IoMin = 1.0).
+// Only used when pred area <= 1.5x GT area to avoid false TPs from oversized preds.
+// Returns inter / min(area_a, area_b).
 static float iomin(const BoardDetection &a, const BoardDetection &b)
 {
     const float ix1 = std::max(a.x1, b.x1);
@@ -40,6 +47,7 @@ static float iomin(const BoardDetection &a, const BoardDetection &b)
     return min_area > 0.0f ? inter / min_area : 0.0f;
 }
 
+// Division that returns 0 when denominator is zero, used for precision/recall/F1.
 static float safe_div(float num, float den) { return den > 0.0f ? num / den : 0.0f; }
 
 // ---------------------------------------------------------------------------
@@ -47,6 +55,9 @@ static float safe_div(float num, float den) { return den > 0.0f ? num / den : 0.
 // ---------------------------------------------------------------------------
 namespace evaluator {
 
+// Reads YOLO label files for each frame in the board and converts normalized
+// (cx, cy, w, h) coordinates to absolute board-coordinate bboxes by applying
+// per-frame pixel dimensions and cumulative x offsets from frame stitching.
 std::vector<BoardDetection> parse_gt(const BoardResult &board,
                                      const std::filesystem::path &labels_dir)
 {
@@ -97,6 +108,11 @@ std::vector<BoardDetection> parse_gt(const BoardResult &board,
     return gt;
 }
 
+// Greedy TP/FP matching between predictions and GT at a given IoU threshold.
+// Predictions are processed in descending confidence order. Each GT is matched
+// at most once. Matching metric is max(IoU, IoMin), but IoMin is only applied
+// when pred area <= 1.5x GT area to prevent oversized preds from being scored as TP.
+// Returns per-board metrics and a per-detection TP/FP label list for mAP computation.
 std::pair<BoardMetrics, std::vector<EvalDetection>> match(const BoardResult &pred,
                                                           const std::vector<BoardDetection> &gt,
                                                           float iou_threshold, float conf_threshold)
@@ -161,6 +177,10 @@ std::pair<BoardMetrics, std::vector<EvalDetection>> match(const BoardResult &pre
     return {m, eval_dets};
 }
 
+// Computes mAP@IoU=0.5 from the full detection list across all boards.
+// Detections are sorted by confidence, then cumulative precision and recall are
+// computed. Precision is made monotonically non-increasing right-to-left before
+// trapezoid integration to get AP (standard COCO/VOC convention).
 float compute_map50(std::vector<EvalDetection> all_dets, int num_gt_total)
 {
     if (num_gt_total == 0)
@@ -196,6 +216,9 @@ float compute_map50(std::vector<EvalDetection> all_dets, int num_gt_total)
     return std::max(0.0f, ap);
 }
 
+// Aggregates per-board metrics into a single EvalResult.
+// Sums TP/FP/FN across all boards, computes global precision/recall/F1,
+// and delegates mAP50 computation to compute_map50.
 EvalResult aggregate(std::vector<BoardMetrics> per_board, std::vector<EvalDetection> all_dets,
                      int num_gt_total, int num_frames, float iou_threshold)
 {

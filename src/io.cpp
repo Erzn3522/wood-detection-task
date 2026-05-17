@@ -14,6 +14,8 @@
 
 namespace io {
 
+// Loads a PNG from disk as a BGR color image.
+// Throws if the file does not exist or cannot be decoded.
 cv::Mat load_png(const std::filesystem::path &path)
 {
     cv::Mat img = cv::imread(path.string(), cv::IMREAD_COLOR);
@@ -23,6 +25,9 @@ cv::Mat load_png(const std::filesystem::path &path)
     return img;
 }
 
+// Serializes a BoardResult to a JSON file under out_dir/{board_index}.json.
+// Each knot is written as a 4-corner polygon (axis-aligned bbox corners in
+// board coordinates) plus confidence and the list of frame indices it spans.
 void write_board_json(const BoardResult &r, const std::filesystem::path &out_dir)
 {
     std::filesystem::create_directories(out_dir);
@@ -34,6 +39,7 @@ void write_board_json(const BoardResult &r, const std::filesystem::path &out_dir
     j["board_width_px"] = r.board_width_px;
     j["board_height_px"] = r.board_height_px;
 
+    // Encode each knot bbox as a clockwise 4-point polygon: TL, TR, BR, BL.
     auto knots = nlohmann::json::array();
     for (const auto &k : r.knots) {
         nlohmann::json entry;
@@ -51,10 +57,13 @@ void write_board_json(const BoardResult &r, const std::filesystem::path &out_dir
     f << j.dump(2) << '\n';
 }
 
+// Stitches all frames of a board horizontally and draws predicted knot bboxes
+// in green with a confidence label. Writes the result to out_dir/images/{board}.png.
+// Useful as a quick sanity check without running the full visualizer.
 void write_board_image(const BoardResult &r, const std::filesystem::path &frames_dir,
                        const std::filesystem::path &out_dir)
 {
-    // Stitch frames horizontally into one board image
+    // Load and concatenate all frames left-to-right to form the full board image.
     std::vector<cv::Mat> frames;
     frames.reserve(r.frames.size());
     for (const auto &fname : r.frames)
@@ -63,7 +72,7 @@ void write_board_image(const BoardResult &r, const std::filesystem::path &frames
     cv::Mat board;
     cv::hconcat(frames, board);
 
-    // Draw detected knot bboxes
+    // Overlay each knot bbox in green with its confidence percentage.
     for (const auto &k : r.knots) {
         const cv::Point pt1(static_cast<int>(k.x1), static_cast<int>(k.y1));
         const cv::Point pt2(static_cast<int>(k.x2), static_cast<int>(k.y2));
@@ -81,6 +90,9 @@ void write_board_image(const BoardResult &r, const std::filesystem::path &frames
         throw std::runtime_error("Cannot write image: " + out_path.string());
 }
 
+// Writes aggregate evaluation metrics to out_dir/metrics.json.
+// Includes IoU threshold, board/frame counts, TP/FP/FN totals,
+// precision, recall, F1, and mAP50.
 void write_metrics_json(const EvalResult &r, const std::filesystem::path &out_dir)
 {
     std::filesystem::create_directories(out_dir);
@@ -102,10 +114,14 @@ void write_metrics_json(const EvalResult &r, const std::filesystem::path &out_di
     f << j.dump(2) << '\n';
 }
 
+// Writes a human-readable Markdown report to out_dir/REPORT.md.
+// Includes an aggregate summary table followed by a per-board breakdown
+// sorted by F1 ascending so the worst-performing boards appear first.
 void write_report_md(const EvalResult &r, const std::filesystem::path &out_dir)
 {
     std::filesystem::create_directories(out_dir);
 
+    // Helper to format floats to 3 decimal places for the Markdown table.
     auto fmt = [](float v) {
         std::ostringstream ss;
         ss << std::fixed << std::setprecision(3) << v;
@@ -129,7 +145,7 @@ void write_report_md(const EvalResult &r, const std::filesystem::path &out_dir)
     f << "| F1 | " << fmt(r.f1) << " |\n";
     f << "| mAP50 | " << fmt(r.map50) << " |\n\n";
 
-    // Per-board table sorted by F1 ascending (worst first)
+    // Sort per-board results by F1 ascending so worst boards appear first.
     auto sorted = r.per_board;
     std::sort(sorted.begin(), sorted.end(),
               [](const BoardMetrics &a, const BoardMetrics &b) { return a.f1 < b.f1; });

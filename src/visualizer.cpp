@@ -20,6 +20,8 @@ static constexpr int kHeaderH = 40; // per-frame mode: header strip height
 // ---------------------------------------------------------------------------
 // Parse a board JSON back into a BoardResult (shared by both modes)
 // ---------------------------------------------------------------------------
+// Deserializes a board JSON file written by io::write_board_json back into a BoardResult.
+// Polygon corners are stored as [TL, TR, BR, BL]; x1/y1 come from index 0, x2/y2 from index 2.
 static BoardResult parse_board_json(const std::filesystem::path &path)
 {
     std::ifstream f(path);
@@ -37,6 +39,7 @@ static BoardResult parse_board_json(const std::filesystem::path &path)
 
     for (const auto &k : j["knots"]) {
         BoardDetection bd;
+        // Reconstruct bbox from TL (index 0) and BR (index 2) polygon corners.
         bd.x1 = k["polygon"][0][0];
         bd.y1 = k["polygon"][0][1];
         bd.x2 = k["polygon"][2][0];
@@ -51,6 +54,8 @@ static BoardResult parse_board_json(const std::filesystem::path &path)
 // ---------------------------------------------------------------------------
 // IoU and IoMin for matching (board-coord space)
 // ---------------------------------------------------------------------------
+// Standard IoU for visualization matching; mirrors evaluator.cpp logic.
+// Returns inter / (area_a + area_b - inter).
 static float iou(const BoardDetection &a, const BoardDetection &b)
 {
     const float ix1 = std::max(a.x1, b.x1);
@@ -67,6 +72,8 @@ static float iou(const BoardDetection &a, const BoardDetection &b)
     return inter / (area_a + area_b - inter);
 }
 
+// Intersection over minimum area; catches containment cases where IoU is low.
+// Returns inter / min(area_a, area_b).
 static float iomin(const BoardDetection &a, const BoardDetection &b)
 {
     const float ix1 = std::max(a.x1, b.x1);
@@ -85,6 +92,10 @@ static float iomin(const BoardDetection &a, const BoardDetection &b)
 // ---------------------------------------------------------------------------
 // Match predictions → tp_flags; marks gt_matched for matched GT boxes
 // ---------------------------------------------------------------------------
+// Greedy TP/FP assignment for visualization coloring.
+// Mirrors the evaluator matching logic: predictions are processed in descending
+// confidence order, each GT is matched at most once, threshold is 0.5.
+// Fills gt_matched in place so the caller can identify unmatched GT (FN) boxes.
 static std::vector<bool> match_predictions(const std::vector<BoardDetection> &knots,
                                            const std::vector<BoardDetection> &gt,
                                            std::vector<bool> &gt_matched)
@@ -92,6 +103,7 @@ static std::vector<bool> match_predictions(const std::vector<BoardDetection> &kn
     std::vector<bool> tp(knots.size(), false);
     std::vector<size_t> order(knots.size());
     std::iota(order.begin(), order.end(), 0);
+    // Process highest-confidence predictions first.
     std::sort(order.begin(), order.end(),
               [&](size_t a, size_t b) { return knots[a].conf > knots[b].conf; });
 
@@ -119,6 +131,8 @@ static std::vector<bool> match_predictions(const std::vector<BoardDetection> &kn
 // Tiled mode helpers
 // ===========================================================================
 
+// Draws a board-coordinate bbox onto a tiled canvas, clipped to the tile(s) it overlaps.
+// A bbox spanning multiple frames is drawn once per overlapping tile, clipped at each tile edge.
 static void draw_box_in_tile(cv::Mat &canvas, float board_x1, float board_y1, float board_x2,
                              float board_y2, const std::vector<int> &frame_widths, int row_height,
                              int cols, const cv::Scalar &color, const std::string &label = "")
@@ -127,11 +141,13 @@ static void draw_box_in_tile(cv::Mat &canvas, float board_x1, float board_y1, fl
     for (int fi = 0; fi < static_cast<int>(frame_widths.size()); ++fi) {
         const int fw = frame_widths[fi];
         if (board_x2 > x_off && board_x1 < x_off + fw) {
+            // Map frame fi to its tile position in the grid.
             const int row = fi / cols;
             const int col = fi % cols;
             const int tile_x = col * kTileW;
             const int tile_y = row * row_height;
 
+            // Clip bbox to the tile's x range, then offset to canvas coordinates.
             const int bx1 = std::max(0, static_cast<int>(board_x1 - x_off)) + tile_x;
             const int by1 = static_cast<int>(board_y1) + tile_y;
             const int bx2 = std::min(fw, static_cast<int>(board_x2 - x_off)) + tile_x;
@@ -148,6 +164,10 @@ static void draw_box_in_tile(cv::Mat &canvas, float board_x1, float board_y1, fl
     }
 }
 
+// Tiled mode: lays out all frames of each board in a grid (N rows x cols columns).
+// Each cell is kTileW wide with a kPadding strip below for the frame index label.
+// Prediction bboxes are drawn in green (no GT) or TP/FP colors (with GT).
+// FN GT boxes are drawn in red. Output: one PNG per board.
 static void run_tiled_impl(const std::filesystem::path &predictions_dir,
                            const std::filesystem::path &frames_dir,
                            const std::filesystem::path &out_dir,
@@ -244,6 +264,7 @@ struct FrameStats {
     int tp_cross = 0, fp_cross = 0; // subset of tp/fp that span a frame boundary
 };
 
+// Returns the cumulative x offset (in board pixels) at the start of frame fi.
 static int frame_x_offset(int fi, const std::vector<int> &fw)
 {
     int off = 0;
@@ -269,6 +290,8 @@ static int bleeding_edge(const BoardDetection &d, int fi, const std::vector<int>
     return -1;
 }
 
+// Draws a dashed line between p1 and p2 by alternating filled and skipped segments.
+// dash/gap are lengths in pixels; parameterized along the line direction.
 static void draw_dashed_line(cv::Mat &img, cv::Point p1, cv::Point p2, const cv::Scalar &color,
                              int thickness, int dash = 7, int gap = 4)
 {
@@ -280,6 +303,7 @@ static void draw_dashed_line(cv::Mat &img, cv::Point p1, cv::Point p2, const cv:
     const double step = dash + gap;
     const int n_segs = static_cast<int>(len / step) + 1;
     for (int i = 0; i < n_segs; ++i) {
+        // t1/t2 are fractional positions along the line [0, 1].
         const double t1 = std::min(1.0, i * step / len);
         const double t2 = std::min(1.0, (i * step + dash) / len);
         cv::line(img, cv::Point(static_cast<int>(p1.x + t1 * dx), static_cast<int>(p1.y + t1 * dy)),
@@ -382,11 +406,20 @@ static void render_header(cv::Mat &hdr, const std::string &fname, int fi, int n,
                 cv::Scalar(180, 180, 180), 1, cv::LINE_AA);
 }
 
+// Per-frame mode: writes one annotated PNG per input frame.
+// Each output has a 40 px dark header with frame name, TP/FP/FN counts and legend,
+// followed by the original frame with overlaid prediction and GT boxes.
+// Cross-frame knots are marked with dashed edges and arrow markers.
 static void run_per_frame_impl(const std::filesystem::path &predictions_dir,
                                const std::filesystem::path &frames_dir,
                                const std::filesystem::path &out_dir,
                                const std::filesystem::path &labels_dir)
 {
+    if (!std::filesystem::is_directory(predictions_dir)) {
+        std::cerr << "[error] predictions directory not found: " << predictions_dir
+                  << "\nRun 'predict' or 'test' first to generate predictions.\n";
+        return;
+    }
     std::filesystem::create_directories(out_dir);
     const bool has_gt = !labels_dir.empty() && std::filesystem::is_directory(labels_dir);
 
@@ -535,6 +568,8 @@ static void run_per_frame_impl(const std::filesystem::path &predictions_dir,
 // ===========================================================================
 namespace visualizer {
 
+// Dispatches to the selected visualization mode.
+// cols is only used in Tiled mode; ignored in PerFrame mode.
 void run(Mode mode, const std::filesystem::path &predictions_dir,
          const std::filesystem::path &frames_dir, const std::filesystem::path &out_dir,
          const std::filesystem::path &labels_dir, int cols)
