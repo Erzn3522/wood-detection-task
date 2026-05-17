@@ -113,7 +113,16 @@ static std::vector<bool> match_predictions(const std::vector<BoardDetection> &kn
         for (size_t gi = 0; gi < gt.size(); ++gi) {
             if (gt_matched[gi])
                 continue;
-            const float v = std::max(iou(knots[idx], gt[gi]), iomin(knots[idx], gt[gi]));
+            const float area_k = (knots[idx].x2 - knots[idx].x1) * (knots[idx].y2 - knots[idx].y1);
+            const float area_g = (gt[gi].x2 - gt[gi].x1) * (gt[gi].y2 - gt[gi].y1);
+            // IoMin only helps when boxes are similarly sized; skip it when one is
+            // much larger than the other (ratio > 1.5) to avoid false TP coloring
+            // (e.g. a tiny pred fully inside a huge GT box would score IoMin ≈ 1).
+            const float ratio = (std::min(area_k, area_g) > 0.0f)
+                                    ? std::max(area_k, area_g) / std::min(area_k, area_g)
+                                    : 0.0f;
+            const float v = (ratio <= 1.5f) ? std::max(iou(knots[idx], gt[gi]), iomin(knots[idx], gt[gi]))
+                                            : iou(knots[idx], gt[gi]);
             if (v > best) {
                 best = v;
                 best_gi = static_cast<int>(gi);
