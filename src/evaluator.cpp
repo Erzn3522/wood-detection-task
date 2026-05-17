@@ -28,9 +28,10 @@ static float iou(const BoardDetection &a, const BoardDetection &b)
     return inter / (area_a + area_b - inter);
 }
 
-// Intersection over minimum area — catches the case where a small GT box is
-// fully contained inside a larger prediction (IoU would be low, IoMin = 1.0).
-// Only used when pred area <= 1.5x GT area to avoid false TPs from oversized preds.
+// Intersection over minimum area — catches the case where one box is fully
+// contained inside the other (IoU would be low, IoMin = 1.0).
+// Only used when max(area_a, area_b) / min(area_a, area_b) <= 1.5 to avoid
+// false TPs when a tiny pred lands inside a large GT or vice versa.
 // Returns inter / min(area_a, area_b).
 static float iomin(const BoardDetection &a, const BoardDetection &b)
 {
@@ -111,7 +112,8 @@ std::vector<BoardDetection> parse_gt(const BoardResult &board,
 // Greedy TP/FP matching between predictions and GT at a given IoU threshold.
 // Predictions are processed in descending confidence order. Each GT is matched
 // at most once. Matching metric is max(IoU, IoMin), but IoMin is only applied
-// when pred area <= 1.5x GT area to prevent oversized preds from being scored as TP.
+// when max(area_p, area_g) / min(area_p, area_g) <= 1.5 to prevent false TPs
+// from tiny preds inside large GT boxes or large preds containing small GT boxes.
 // Returns per-board metrics and a per-detection TP/FP label list for mAP computation.
 std::pair<BoardMetrics, std::vector<EvalDetection>> match(const BoardResult &pred,
                                                           const std::vector<BoardDetection> &gt,
@@ -136,7 +138,9 @@ std::pair<BoardMetrics, std::vector<EvalDetection>> match(const BoardResult &pre
             if (gt_matched[gi])
                 continue;
             const float area_g = (gt[gi].x2 - gt[gi].x1) * (gt[gi].y2 - gt[gi].y1);
-            const float ratio = (area_g > 0.0f) ? area_p / area_g : 0.0f;
+            const float ratio = (std::min(area_p, area_g) > 0.0f)
+                                    ? std::max(area_p, area_g) / std::min(area_p, area_g)
+                                    : 0.0f;
             const float v = (ratio <= 1.5f) ? std::max(iou(p, gt[gi]), iomin(p, gt[gi]))
                                              : iou(p, gt[gi]);
             if (v > best_iou) {
